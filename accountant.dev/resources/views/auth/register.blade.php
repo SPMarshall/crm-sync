@@ -34,7 +34,7 @@
                         <div class="form-group">
                             <label class="col-md-4 control-label">Company: <span aria-hidden="true" class="glyphicon-asterisk"></span></label>
                             <div class="col-md-6">
-                                <input type="text" class="form-control" name="company_name" value="{{ old('inn') }}">
+                                <input type="text" class="form-control" name="company_name" value="{{ old('company_name') }}">
                             </div>
                         </div>
 
