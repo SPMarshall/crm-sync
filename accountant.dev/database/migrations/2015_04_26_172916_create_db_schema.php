@@ -28,9 +28,6 @@ class CreateDbSchema extends Migration {
             $table->increments('id');
             $table->string('kved',5)->unique();
             $table->text('description')->default(null);
-            $table->boolean('edited')->default(false);
-            $table->enum('operation', array('update', 'delete'))->default('update'); 	
-            $table->index(['operation','edited']);
             $table->timestamps();
         });
         
@@ -42,6 +39,18 @@ class CreateDbSchema extends Migration {
             $table->integer('kved_id')->unsigned()->index();
             $table->foreign('kved_id')->references('id')->on('kveds')->onDelete('cascade');
             $table->boolean('main')->default(false);
+        });
+    
+       
+         Schema::create('journals', function(Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->increments('id');
+            $table->string('entity_name',20);
+            $table->string('entity_identifier',20);
+            $table->enum('operation', array('create','update','delete'))->default('update'); 	
+            $table->text('data')->nullable()->default(null); 	
+            $table->index(['entity_name','entity_identifier']);
+            $table->timestamps();
         });
     
         
@@ -56,6 +65,7 @@ class CreateDbSchema extends Migration {
         Schema::drop('kved_user');
         Schema::drop('users');
         Schema::drop('kveds');
+        Schema::drop('journals');
     }
 
 }

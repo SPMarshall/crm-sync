@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Journal;
 use App\Kved;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ class KvedController extends Controller {
     public function __construct(Request $request, Guard $auth) {
         $this->_request = $request;
         $this->_auth = $auth;
-        /*we allow all ajax methods for now*/
+        /* we allow all ajax methods for now */
         $this->middleware('auth', ['only' => ['postKved', 'getDeleteKved']]);
     }
 
@@ -33,7 +34,7 @@ class KvedController extends Controller {
      */
     public function postKved() {
         $this->validate($this->_request, [
-            'kved' => 'required|max:5',
+            'kved' => 'required',
         ]);
 
         $with = ['message' => 'A new Kved has been added!', 'alert-class' => 'alert-success'];
@@ -54,11 +55,10 @@ class KvedController extends Controller {
             $kved = new Kved();
             $kved->description = mb_convert_encoding($arr[1], "utf-8", "windows-1251");
             $kved->kved = $arr[0];
+            if ($kved->save()) {
+                Journal::create(['entity_name' => 'Kved', 'entity_identifier' => $kved->kved, 'operation' => 'create', 'data' => json_encode($kved)]);
+            }
         }
-        /* We do need to mark them as edited and update */
-        $kved->edited = 1;
-        $kved->operation = 'update';
-        $kved->save();
 
         $curr_ids = $this->_auth->user()->kveds()->lists('id');
         $curr_ids[] = $kved->id;
@@ -91,19 +91,22 @@ class KvedController extends Controller {
      * @return Response
      */
     public function postKvedFieldAjax() {
+        
         $this->validate($this->_request, [
             'kved_id' => 'required',
             'field' => 'required',
             'value' => 'required',
         ]);
+        
         $params = $this->_request->only('kved_id', 'field', 'value');
         $kved_model = Kved::findOrFail($params['kved_id']);
         $kved_model->$params['field'] = trim($params['value']);
-        $kved_model->operation = 'update';
-        $kved_model->edited = 1;
+        
         $result = $kved_model->save();
-        if ($result)
+        if ($result){
+            Journal::create(['entity_name' => 'Kved', 'entity_identifier' => $kved_model->kved, 'operation' => 'update', 'data' => json_encode($kved_model)]);
             return response()->json(['status' => 'OK', 'code' => '200']);
+        }
         return response()->json(['status' => 'Error']);
     }
 
@@ -115,14 +118,10 @@ class KvedController extends Controller {
      */
     public function getDeleteKved($kved_id) {
         if ($kved_id) {
-            $kved_model = Kved::where('operation', '!=', 'delete')->whereId($kved_id)->first();
+            $kved_model = Kved::find($kved_id);
             if ($kved_model) {
-                $kved_model->operation = 'delete';
-                $kved_model->edited = 1;
-                $kved_model->save();
-                if ($kved_model->users()->lists('id')) {
-                    $kved_model->users()->detach($kved_model->users()->lists('id'));
-                }
+                Journal::create(['entity_name' => 'Kved', 'entity_identifier' => $kved_model->kved, 'operation' => 'delete']);
+                $kved_model->delete();
                 return response()->json(['status' => 'OK', 'code' => '200']);
             }
         }

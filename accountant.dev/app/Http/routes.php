@@ -8,6 +8,6 @@ Route::controllers([
         
 ]); 
 
-Route::get('/kved-facade/count/{operation}', 'KvedFacadeController@getCount');
-Route::post('/kved-facade/kveds', 'KvedFacadeController@postKveds');
-Route::post('/kved-facade/confirm-sync', 'KvedFacadeController@postConfirmSync');
+Route::get('/sync/count', 'SyncController@getCount');
+Route::post('/sync/data', 'SyncController@postData');
+Route::post('/sync/confirm', 'SyncController@postConfirm');

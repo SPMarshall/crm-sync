@@ -36,9 +36,10 @@ class PagesController extends Controller {
      * @return View for pages.kveds
      */
     public function getKvedList() {
-        $kveds = $kved = Kved::where('operation', '!=', 'delete')->orderBy('kved')->get();
-        $selected_page = 'kveds';
-        return view('pages.kveds', compact('kveds', 'selected_page'));
+        return view('pages.kveds',[
+            'kveds'=> Kved::orderBy('kved')->get(),
+            'selected_page'=>'kveds',
+        ]);
     }
 
 }

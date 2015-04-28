@@ -1,6 +1,9 @@
 <?php
+
 namespace App\Http\Controllers;
+
 set_time_limit(0);
+
 use App\Kved;
 use Illuminate\Support\Facades\DB;
 use Ixudra\Curl\Facades\Curl;
@@ -16,55 +19,27 @@ class SyncController extends Controller {
      * @return Response
      */
     public function synchronize() {
-        
         $start = time();
         $start_micro = microtime();
-        //#1. Get Deleted Count.
-        $count_delete = $this->_sendRequest('kved-facade/count/delete', 'get');
-        $this->_validateJson($count_delete);
-        
-
-        //#2. Process Deleted kveds by kved id.
+        $count = $this->_sendRequest('sync/count', 'get');
+        $this->_validateJson($count);
         $i = 0;
-        while ($i < $count_delete['data']) {
-            $get_kveds = $this->_sendRequest('kved-facade/kveds', 'post', ['count' => config('app.sync_rows_count'), 'operation' => 'delete', 'field_list' => ['kved']]);
-
-            //#3. Confirm Deletion
-            $kved_codes = array_flatten($get_kveds['data']);
-            $confirm_deletion = $this->_deleteKveds($kved_codes);
-            if ($confirm_deletion) {
-                $response = $this->_sendRequest('kved-facade/confirm-sync', 'post', ['kved_codes' => $kved_codes]);
-                Log::info('Synchronization Successful:: Delete operation is synchronized for: ', ['kved_codes' => implode(',  ', $kved_codes)]);
-            } else {
-                Log::critical('Synchronization Failed :: Unable to synchronize delete operation for :', ['kved_codes' => implode(',  ', $kved_codes)]);
+        while ($i < $count['data']) {
+            $data = $this->_sendRequest('sync/data', 'post', ['count' => config('app.sync_rows_count')]);
+            $journal_ids = $this->_process($data['data']);
+            if ($journal_ids) {
+                $this->_sendRequest('sync/confirm', 'post', ['ids' => json_encode($journal_ids)]);
+                Log::info('Synchronization Successful.');
             }
             $i = $i + config('app.sync_rows_count');
         }
-        
-        //#4. Get Updated Count
-        $count_updated = $this->_sendRequest('kved-facade/count/update', 'get');
-        //#5. Process Update or Insert kveds.
-        $i = 0;
-        while ($i < $count_updated['data']) {
-            $get_kveds = $this->_sendRequest('kved-facade/kveds', 'post', ['count' => config('app.sync_rows_count'), 'operation' => 'update', 'field_list' => ['kved', 'description']]);
-            //#6. Confirm Deletion
-            $kved_codes_arr = $this->_createKveds($get_kveds['data']);
-            if ($kved_codes_arr) {
-                $response = $this->_sendRequest('kved-facade/confirm-sync', 'post', ['kved_codes' => $kved_codes_arr]);
-                Log::info('Synchronization Successful:: Add/update operation is synchronized for: ', ['kved_codes' => implode(',  ', $kved_codes_arr)]);
-            } else {
-                Log::critical('Synchronization Failed :: Unable to synchronize add/update operation for :', ['kved_codes' => implode(',  ', $kved_codes_arr)]);
-            }
-            $i = $i + config('app.sync_rows_count');
-        }
-
         $s = time() - $start;
         $m = floor($s / 60);
         $h = floor($m / 60);
         $mins = ($m % 60);
         $seconds = ($s % 60);
         $deviation = microtime() - $start_micro;
-        dd("Synchronization completed. Script has been running for: MicroSeconds - $deviation  Seconds - $seconds  | Minutes - $mins | Hours - $h | Step - ".config('app.sync_rows_count'));
+        dd("Synchronization completed. It took: MicroSeconds - $deviation  Seconds - $seconds  | Minutes - $mins | Step - " . config('app.sync_rows_count'));
     }
 
     /**
@@ -80,6 +55,7 @@ class SyncController extends Controller {
         else {
             $response = Curl::post('http://accountant.dev/' . $action_url, null, $params);
         }
+        
         if ($response)
             return json_decode($response, true);
         return false;
@@ -111,50 +87,39 @@ class SyncController extends Controller {
     }
 
     /**
-     * Hadles kveds add/update
+     * Process crud operations for each rows
      * 
      * @param array $data
-     * @return mixed array on success/boolean on failure
+     * @return array
      */
-    private function _createKveds($data) {
-        if (!$data)
+    private function _process($data) {
+        if (!$data || !is_array($data))
             return false;
-        $array_kved_codes = [];
+
+        $processed_journal_ids = [];
         try {
             DB::beginTransaction();
-            foreach ($data as $item) {
-                $tmp = array_flatten($item);
-                list($kved_code, $kved_description) = $tmp;
-                if (Kved::updateOrCreate(['kved' => $kved_code], ['description' => $kved_description])) {
-                    $array_kved_codes[] = $kved_code;
+            foreach ($data as $journal_row) {
+                //we assume that all rows are kveds for now.
+                switch ($journal_row['operation']) {
+                    case 'create':
+                    case 'update':
+                        $tmp_obj = json_decode($journal_row['data']);
+                        Kved::updateOrCreate(['kved' => $journal_row['entity_identifier']], ['description' => $tmp_obj->description]);
+                        break;
+
+                    case 'delete':
+                        Kved::where('kved', $journal_row['entity_identifier'])->delete();
+                        break;
                 }
+                $processed_journal_ids[] = $journal_row['id'];
             }
             DB::commit();
         } catch (Exception $s) {
             DB::rollback();
-            $array_kved_codes = false;
+            $processed_journal_ids = false;
         }
-        return $array_kved_codes;
-    }
-
-    /**
-     * Handles deletion operation
-     * 
-     * @param array $array_kved_num
-     * @return boolean
-     */
-    private function _deleteKveds($array_kved_num) {
-        if (!$array_kved_num)
-            return false;
-
-        try {
-            DB::beginTransaction();
-            DB::table('kveds')->whereIn('kved', $array_kved_num)->delete();
-            DB::commit();
-        } catch (Exception $s) {
-            DB::rollback();
-        }
-        return true;
+        return $processed_journal_ids;
     }
 
 }

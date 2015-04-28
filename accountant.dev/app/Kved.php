@@ -18,7 +18,7 @@ class Kved extends Model {
      *
      * @var array
      */
-    protected $fillable = ['kved', 'description','edited','operation'];
+    protected $fillable = ['kved', 'description',];
 
     public function users() {
         return $this->belongsToMany('App\User')->withPivot('main');//additional pivat table field

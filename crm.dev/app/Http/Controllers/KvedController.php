@@ -13,9 +13,8 @@ class KvedController extends Controller {
      * @return \Illuminate\View\View
      */
     public function index() {
-        $kveds = Kved::orderBy('kved')->get();
         return view('kveds', [
-            'kveds' => $kveds,
+            'kveds' => Kved::orderBy('kved')->get(),
         ]);
     }
 

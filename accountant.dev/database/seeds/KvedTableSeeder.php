@@ -5,7 +5,7 @@ use Illuminate\Database\Seeder;
 class KvedTableSeeder extends Seeder {
 
     public function run() {
-        DB::table('kveds')->delete();
+        /*DB::table('kveds')->delete();
 
         $descriptions = [
             'Діяльність ресторанів, надання послуг мобільного харчування',
@@ -33,7 +33,7 @@ class KvedTableSeeder extends Seeder {
             }
         }
 
-        DB::table('kveds')->insert($kveds);
+        DB::table('kveds')->insert($kveds);*/
     }
 
 }
