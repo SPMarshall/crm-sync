@@ -49,7 +49,6 @@ class CreateDbSchema extends Migration {
             $table->string('entity_identifier',20);
             $table->enum('operation', array('create','update','delete'))->default('update'); 	
             $table->text('data')->nullable()->default(null); 	
-            $table->index(['entity_name','entity_identifier']);
             $table->timestamps();
         });
     
